@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Suman APP — Live Catalog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{--bg:#0b1220;--card:#121a2a;--text:#e9eef7;--muted:#a6b0c3;--accent:#5cc8ff}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 16px rgba(0,0,0,.25)}
+    h1{margin:0} .row{display:flex;gap:10px;align-items:center;margin:14px 0}
+    input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid #22324d;background:#0e1628;color:var(--text)}
+    button{background:var(--accent);color:#051625;border:none;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer}
+    .muted{color:var(--muted);font-size:12px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px;border-bottom:1px solid #22324d;vertical-align:top;text-align:left}
+    th{color:var(--muted)}
+    img.thumb{width:60px;height:60px;object-fit:cover;border-radius:8px;background:#0e1628}
+    .price{font-weight:700}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row" style="justify-content:space-between">
+      <h1>Suman APP — Live Catalog</h1>
+      <button id="reload">Reload</button>
+    </div>
+    <p class="muted">Reading from Supabase table <b>app_suman_brothers</b>. Search and click Enquire to WhatsApp.</p>
+
+    <div class="card">
+      <div class="row"><input id="search" placeholder="Search by title, SKU, brand, category…" /></div>
+      <div id="status" class="muted">Loading products…</div>
+      <table id="grid" style="display:none">
+        <thead>
+          <tr>
+            <th>Image</th><th>Title / Description</th><th>SKU</th><th>Brand</th><th>Category</th><th>Price</th><th>Pack</th><th>Stock</th><th>Enquire</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script>
+    const SUPABASE_URL = "https://gvaznlyfmsypqirlcheq.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2YXpubHlmbXN5cHFpcmxjaGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNjQzMTksImV4cCI6MjA3MDc0MDMxOX0.OD0gM6t_lrwT5U_QLbK8ckozS_s6OC2pbaqQO-xTAcM";
+    const TABLE = "app_suman_brothers";
+    const WHATSAPP_NUMBER = "447442232768";
+
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const statusEl = document.getElementById('status');
+    const grid = document.getElementById('grid');
+    const tbody = grid.querySelector('tbody');
+    const search = document.getElementById('search');
+    document.getElementById('reload').addEventListener('click', fetchProducts);
+
+    function money(v){ if(v==null||v==='')return ''; const n=Number(v); return isNaN(n)?String(v):'£'+n.toFixed(2); }
+    function enquireLink(p){
+      const msg = `Hello Suman Brothers, I would like to enquire/order:
+• ${p.title||''} (${p.sku||''})
+${p.price!=null?('• Price: £'+Number(p.price).toFixed(2)) : ''}
+${p.pack_size?('• Pack: '+p.pack_size):''}`;
+      return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+    }
+
+    async function fetchProducts(){
+      statusEl.textContent="Loading products…"; grid.style.display="none"; tbody.innerHTML='';
+      const { data, error } = await client
+        .from(TABLE).select('*')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if(error){ statusEl.textContent = "Error: "+(error.message||JSON.stringify(error)); return; }
+      window._all = data || [];
+      statusEl.textContent = window._all.length + " products loaded.";
+      render(window._all); grid.style.display='';
+    }
+
+    function render(list){
+      const q=(search.value||'').trim().toLowerCase();
+      const rows=list.filter(p => !q || [p.title,p.sku,p.brand,p.category,p.short_description].some(v => (v||'').toLowerCase().includes(q)))
+      .map(p=>{
+        const tr=document.createElement('tr');
+        const img=document.createElement('img'); img.className='thumb'; img.src=(p.image_url||'').trim()||'https://via.placeholder.com/60?text=SB'; img.alt=p.title||'image';
+        const tdImg=document.createElement('td'); tdImg.appendChild(img); tr.appendChild(tdImg);
+        const tdTitle=document.createElement('td'); tdTitle.innerHTML=`<b>${p.title||''}</b><br><span class="muted">${p.short_description||''}</span>`; tr.appendChild(tdTitle);
+        const tdSku=document.createElement('td'); tdSku.textContent=p.sku||''; tr.appendChild(tdSku);
+        const tdBrand=document.createElement('td'); tdBrand.textContent=p.brand||''; tr.appendChild(tdBrand);
+        const tdCat=document.createElement('td'); tdCat.textContent=p.category||''; tr.appendChild(tdCat);
+        const tdPrice=document.createElement('td'); tdPrice.innerHTML=`<span class="price">${money(p.price)}</span>`; tr.appendChild(tdPrice);
+        const tdPack=document.createElement('td'); tdPack.textContent=p.pack_size||''; tr.appendChild(tdPack);
+        const tdStock=document.createElement('td'); tdStock.textContent=(p.stock_qty ?? ''); tr.appendChild(tdStock);
+        const tdEnq=document.createElement('td'); const a=document.createElement('a'); a.href=enquireLink(p); a.target='_blank'; a.rel='noopener'; a.textContent='Enquire';
+        a.style.display='inline-block'; a.style.padding='8px 10px'; a.style.background='var(--accent)'; a.style.color='#051625'; a.style.borderRadius='10px'; a.style.fontWeight='700';
+        tdEnq.appendChild(a); tr.appendChild(tdEnq);
+        return tr;
+      });
+      tbody.innerHTML=''; rows.forEach(r=>tbody.appendChild(r));
+    }
+
+    search.addEventListener('input', ()=>render(window._all||[]));
+    fetchProducts();
+  </script>
+</body>
+</html>
