@@ -4,28 +4,40 @@
   <meta charset="UTF-8" />
   <title>Suman APP — Live Catalog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Optional PWA hooks (safe even if files aren't present yet) -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#111111">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
   <style>
     :root{--bg:#0b1220;--card:#121a2a;--text:#e9eef7;--muted:#a6b0c3;--accent:#5cc8ff}
     *{box-sizing:border-box}
     html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     a{color:inherit;text-decoration:none}
-    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    .wrap{max-width:1200px;margin:0 auto;padding:24px}
     .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 16px rgba(0,0,0,.25)}
     h1{margin:0}
-    .row{display:flex;gap:10px;align-items:center;margin:14px 0}
-    input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid #22324d;background:#0e1628;color:var(--text)}
+    .row{display:flex;gap:10px;align-items:center;margin:14px 0;flex-wrap:wrap}
+    input,select{padding:10px 12px;border-radius:10px;border:1px solid #22324d;background:#0e1628;color:var(--text)}
+    input[type="number"]{width:76px}
     button{background:var(--accent);color:#051625;border:none;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer}
+    .btn-secondary{background:#1a253b;color:var(--text);border:1px solid #22324d}
+    .btn-danger{background:#ee5555;color:#0b1220}
     .muted{color:var(--muted);font-size:12px}
     table{width:100%;border-collapse:collapse;margin-top:12px}
     th,td{padding:10px;border-bottom:1px solid #22324d;vertical-align:top;text-align:left}
     th{color:var(--muted)}
     img.thumb{width:60px;height:60px;object-fit:cover;border-radius:8px;background:#0e1628}
     .price{font-weight:700}
+    .qty-wrap{display:flex;gap:6px;align-items:center}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #22324d;background:#0e1628;color:var(--muted)}
+    .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
     /* Cart UI */
     .cart-badge{background:#1a253b;border:1px solid #22324d;border-radius:10px;padding:8px 12px;cursor:pointer}
     .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:saturate(80%) blur(1px);display:none}
-    .cart-panel{position:fixed;top:0;right:0;height:100%;width:380px;max-width:94vw;background:var(--card);box-shadow:-8px 0 24px rgba(0,0,0,.4);display:none;flex-direction:column}
+    .cart-panel{position:fixed;top:0;right:0;height:100%;width:420px;max-width:96vw;background:var(--card);box-shadow:-8px 0 24px rgba(0,0,0,.4);display:none;flex-direction:column}
     .cart-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #22324d}
     .cart-items{padding:10px 12px;overflow:auto;flex:1}
     .cart-item{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed #22324d}
@@ -34,10 +46,9 @@
     .qty{display:flex;align-items:center;gap:6px}
     .qty button{padding:4px 10px;border-radius:8px}
     .cart-footer{border-top:1px solid #22324d;padding:12px 16px;display:grid;gap:10px}
-    .cart-total{display:flex;justify-content:space-between;font-weight:800}
-    .btn-secondary{background:#1a253b;color:var(--text);border:1px solid #22324d}
-    .btn-danger{background:#ee5555;color:#0b1220}
-    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .totals{display:grid;grid-template-columns:1fr auto;gap:8px}
+    .totals b{text-align:right}
+    .install-btn{display:none}
   </style>
 </head>
 <body>
@@ -45,14 +56,28 @@
     <div class="row" style="justify-content:space-between">
       <h1>Suman APP — Live Catalog</h1>
       <div class="row" style="gap:8px">
+        <button id="installAppBtn" class="install-btn">Install app</button>
         <button id="reload">Reload</button>
         <a id="cartBadge" class="cart-badge" href="javascript:void(0)">Cart (0)</a>
       </div>
     </div>
-    <p class="muted">Reading from Supabase table <b>app_suman_brothers</b>. Search, <b>Add to cart</b>, or click <b>Enquire</b> to WhatsApp.</p>
+    <p class="muted">Reading from Supabase table <b>app_suman_brothers</b>. Search, filter, add to cart, or enquire via WhatsApp. VAT toggle affects prices and totals.</p>
 
+    <!-- Controls -->
     <div class="card">
-      <div class="row"><input id="search" placeholder="Search by title, SKU, brand, category…" /></div>
+      <div class="row">
+        <input id="search" placeholder="Search title, SKU, brand, category…" style="flex:1" />
+        <select id="brandSel"><option value="">All brands</option></select>
+        <select id="catSel"><option value="">All categories</option></select>
+        <select id="sortSel">
+          <option value="new">Newest</option>
+          <option value="plh">Price: Low → High</option>
+          <option value="phl">Price: High → Low</option>
+          <option value="name">Name: A → Z</option>
+        </select>
+        <label class="pill"><input id="vatToggle" type="checkbox" style="vertical-align:middle;margin-right:6px"> Show inc VAT</label>
+      </div>
+
       <div id="status" class="muted">Loading products…</div>
       <table id="grid" style="display:none">
         <thead>
@@ -70,6 +95,9 @@
         </thead>
         <tbody></tbody>
       </table>
+      <div class="row">
+        <button id="clearFilters" class="btn-secondary">Clear filters</button>
+      </div>
     </div>
   </div>
 
@@ -82,50 +110,85 @@
     </div>
     <div id="cartItems" class="cart-items"></div>
     <div class="cart-footer">
-      <div class="cart-total"><span>Items</span><span id="cartCount">0</span></div>
-      <div class="cart-total"><span>Total</span><span id="cartTotal">£0.00</span></div>
-      <div class="actions">
+      <div class="totals"><span>Items</span><b id="cartCount">0</b></div>
+      <div class="totals"><span>Subtotal (ex VAT)</span><b id="subTotal">£0.00</b></div>
+      <div class="totals"><span>VAT (20%)</span><b id="vatAmount">£0.00</b></div>
+      <div class="totals"><span>Total (inc VAT)</span><b id="grandTotal">£0.00</b></div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
         <button id="clearCart" class="btn-danger">Clear cart</button>
         <a id="whatsCheckout" class="btn-secondary" target="_blank" rel="noopener">Order via WhatsApp</a>
         <button id="copyOrder" class="btn-secondary">Copy order text</button>
+        <button id="exportCsv" class="btn-secondary">Export CSV</button>
       </div>
+      <div class="muted">Tip: Free delivery thresholds apply. Prices depend on VAT toggle.</div>
     </div>
   </aside>
 
   <!-- Supabase -->
   <script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script>
-    /* ==== CONFIG ==== */
+    /* ========= CONFIG ========= */
     const SUPABASE_URL = "https://gvaznlyfmsypqirlcheq.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2YXpubHlmbXN5cHFpcmxjaGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNjQzMTksImV4cCI6MjA3MDc0MDMxOX0.OD0gM6t_lrwT5U_QLbK8ckozS_s6OC2pbaqQO-xTAcM";
     const TABLE = "app_suman_brothers";
     const WHATSAPP_NUMBER = "447442232768";
+    const VAT_RATE = 0.20;
 
-    /* ==== HELPERS ==== */
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ========= DOM ========= */
     const statusEl = document.getElementById('status');
     const grid = document.getElementById('grid');
     const tbody = grid.querySelector('tbody');
     const search = document.getElementById('search');
-    document.getElementById('reload').addEventListener('click', fetchProducts);
+    const brandSel = document.getElementById('brandSel');
+    const catSel = document.getElementById('catSel');
+    const sortSel = document.getElementById('sortSel');
+    const vatToggle = document.getElementById('vatToggle');
 
+    document.getElementById('reload').addEventListener('click', fetchProducts);
+    document.getElementById('clearFilters').addEventListener('click', ()=>{
+      search.value=''; brandSel.value=''; catSel.value=''; sortSel.value='new'; applyState();
+    });
+
+    /* ========= CART / WISHLIST ========= */
     const CART_KEY = 'sb_cart';
-    const cart = JSON.parse(localStorage.getItem(CART_KEY) || '{}'); // { id: {id,name,price,img,sku,qty} }
+    const WISH_KEY = 'sb_wishlist';
+    const cart = JSON.parse(localStorage.getItem(CART_KEY) || '{}'); // { id: {id,sku,name,price,img,qty,pack} }  price = ex VAT
+    const wish = JSON.parse(localStorage.getItem(WISH_KEY) || '{}'); // { id: true }
     function saveCart(){ localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
-    function money(v){ if(v==null||v==='')return ''; const n=Number(v); return isNaN(n)?String(v):'£'+n.toFixed(2); }
+    function saveWish(){ localStorage.setItem(WISH_KEY, JSON.stringify(wish)); }
     function cartItemsCount(){ return Object.values(cart).reduce((n,it)=>n+it.qty,0); }
-    function cartTotal(){ return Object.values(cart).reduce((s,it)=>s + (Number(it.price)||0)*it.qty,0); }
+    function cartSubTotal(){ return Object.values(cart).reduce((s,it)=>s + (Number(it.price)||0)*it.qty,0); }
+    function fmtGBP(n){ n=Number(n)||0; return '£'+n.toFixed(2); }
     function updateBadge(){ document.getElementById('cartBadge').textContent = `Cart (${cartItemsCount()})`; }
 
-    function enquireLink(p){
-      const msg = `Hello Suman Brothers, I would like to enquire/order:
-• ${p.title||''} (${p.sku||''})
-${p.price!=null?('• Price: £'+Number(p.price).toFixed(2)) : ''}
-${p.pack_size?('• Pack: '+p.pack_size):''}`;
-      return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+    /* ========= FILTER/SORT/STATE ========= */
+    function getState(){
+      return {
+        q: (search.value||'').trim(),
+        brand: brandSel.value || '',
+        cat: catSel.value || '',
+        sort: sortSel.value || 'new',
+        vat: vatToggle.checked ? '1' : '0'
+      };
+    }
+    function setStateFromQuery(){
+      const p=new URLSearchParams(location.search);
+      if(p.has('q')) search.value=p.get('q');
+      if(p.has('brand')) brandSel.value=p.get('brand');
+      if(p.has('cat')) catSel.value=p.get('cat');
+      if(p.has('sort')) sortSel.value=p.get('sort');
+      if(p.has('vat')) vatToggle.checked = p.get('vat')==='1';
+    }
+    function applyState(push=true){
+      const st=getState();
+      const q=new URLSearchParams(st).toString();
+      if(push) history.replaceState(null,'','?'+q);
+      render(window._all||[]);
     }
 
-    /* ==== DATA LOAD ==== */
+    /* ========= DATA LOAD ========= */
     async function fetchProducts(){
       statusEl.textContent="Loading products…"; grid.style.display="none"; tbody.innerHTML='';
       const { data, error } = await client
@@ -135,75 +198,132 @@ ${p.pack_size?('• Pack: '+p.pack_size):''}`;
       if(error){ statusEl.textContent = "Error: "+(error.message||JSON.stringify(error)); return; }
       window._all = data || [];
       statusEl.textContent = window._all.length + " products loaded.";
+
+      // build brand/category filters
+      fillOptions(brandSel, unique(window._all.map(p=>p.brand)));
+      fillOptions(catSel, unique(window._all.map(p=>p.category)));
+
+      setStateFromQuery(); // apply query params if any
       render(window._all); grid.style.display='';
     }
 
-    /* ==== TABLE RENDER ==== */
+    function unique(arr){
+      return [...new Set(arr.filter(Boolean).map(v=>String(v).trim()))].sort((a,b)=>a.localeCompare(b));
+    }
+    function fillOptions(sel, list){
+      const val=sel.value;
+      sel.innerHTML = '<option value="">All '+(sel===brandSel?'brands':'categories')+'</option>' + list.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+      if(list.includes(val)) sel.value=val;
+    }
+
+    /* ========= RENDER ========= */
     function render(list){
       const q=(search.value||'').trim().toLowerCase();
-      const rows=list
-        .filter(p => !q || [p.title,p.sku,p.brand,p.category,p.short_description].some(v => (v||'').toLowerCase().includes(q)))
-        .map(p=>{
-          const tr=document.createElement('tr');
+      const b=brandSel.value; const c=catSel.value; const s=sortSel.value; const showIncVAT = vatToggle.checked;
 
-          const img=document.createElement('img');
-          img.className='thumb';
-          img.src=(p.image_url||'').trim()||'https://via.placeholder.com/60?text=SB';
-          img.alt=p.title||'image';
-          const tdImg=document.createElement('td'); tdImg.appendChild(img); tr.appendChild(tdImg);
+      let rows = list.filter(p =>
+        (!q || [p.title,p.sku,p.brand,p.category,p.short_description].some(v => (v||'').toLowerCase().includes(q))) &&
+        (!b || (p.brand||'')===b) &&
+        (!c || (p.category||'')===c)
+      );
 
-          const tdTitle=document.createElement('td');
-          tdTitle.innerHTML=`<b>${p.title||''}</b><br><span class="muted">${p.short_description||''}</span>`;
-          tr.appendChild(tdTitle);
+      if(s==='plh') rows.sort((x,y)=>(x.price||0)-(y.price||0));
+      if(s==='phl') rows.sort((x,y)=>(y.price||0)-(x.price||0));
+      if(s==='name') rows.sort((x,y)=>String(x.title||'').localeCompare(String(y.title||'')));
+      // 'new' already ordered by created_at desc from query
 
-          const tdSku=document.createElement('td'); tdSku.textContent=p.sku||''; tr.appendChild(tdSku);
-          const tdBrand=document.createElement('td'); tdBrand.textContent=p.brand||''; tr.appendChild(tdBrand);
-          const tdCat=document.createElement('td'); tdCat.textContent=p.category||''; tr.appendChild(tdCat);
-          const tdPrice=document.createElement('td'); tdPrice.innerHTML=`<span class="price">${money(p.price)}</span>`; tr.appendChild(tdPrice);
-          const tdPack=document.createElement('td'); tdPack.textContent=p.pack_size||''; tr.appendChild(tdPack);
-          const tdStock=document.createElement('td'); tdStock.textContent=(p.stock_qty ?? ''); tr.appendChild(tdStock);
+      tbody.innerHTML='';
+      for(const p of rows){
+        const tr=document.createElement('tr');
 
-          const tdActions=document.createElement('td'); tdActions.style.whiteSpace='nowrap';
+        const img=document.createElement('img');
+        img.className='thumb'; img.loading='lazy';
+        img.src=(p.image_url||'').trim()||'https://via.placeholder.com/60?text=SB';
+        img.alt=p.title||'image';
+        const tdImg=document.createElement('td'); tdImg.appendChild(img); tr.appendChild(tdImg);
 
-          // Add to cart
-          const add=document.createElement('button');
-          add.className='btn-add';
-          add.textContent='Add to cart';
-          add.style.marginRight='8px';
-          add.addEventListener('click',()=>{
-            const id = String(p.sku||p.id||p.title||Math.random());
-            if(!cart[id]) cart[id]={ id, sku:p.sku||'', name:p.title||'', price:Number(p.price)||0, img:p.image_url||'', qty:0 };
-            cart[id].qty++;
-            saveCart(); updateBadge(); flash(add,'Added!');
-          });
-          tdActions.appendChild(add);
+        const tdTitle=document.createElement('td');
+        const packText = p.pack_size ? `<span class="pill">${escapeHtml(p.pack_size)}</span>` : '';
+        tdTitle.innerHTML=`<b>${escapeHtml(p.title||'')}</b> ${packText}<br><span class="muted">${escapeHtml(p.short_description||'')}</span>`;
+        tr.appendChild(tdTitle);
 
-          // Enquire
-          const a=document.createElement('a');
-          a.href=enquireLink(p); a.target='_blank'; a.rel='noopener'; a.textContent='Enquire';
-          a.className='btn-enquire';
-          a.style.display='inline-block'; a.style.padding='8px 10px'; a.style.background='var(--accent)'; a.style.color='#051625'; a.style.borderRadius='10px'; a.style.fontWeight='700';
-          tdActions.appendChild(a);
+        const tdSku=document.createElement('td'); tdSku.textContent=p.sku||''; tr.appendChild(tdSku);
+        const tdBrand=document.createElement('td'); tdBrand.textContent=p.brand||''; tr.appendChild(tdBrand);
+        const tdCat=document.createElement('td'); tdCat.textContent=p.category||''; tr.appendChild(tdCat);
 
-          tr.appendChild(tdActions);
-          return tr;
+        const tdPrice=document.createElement('td');
+        const priceEx = Number(p.price)||0;
+        const priceDisp = showIncVAT ? priceEx*(1+VAT_RATE) : priceEx;
+        tdPrice.innerHTML=`<span class="price">${fmtGBP(priceDisp)}</span><div class="muted">${showIncVAT?'inc VAT':'ex VAT'}</div>`;
+        tr.appendChild(tdPrice);
+
+        const tdPack=document.createElement('td'); tdPack.textContent=p.pack_size||''; tr.appendChild(tdPack);
+
+        const tdStock=document.createElement('td');
+        const inStock = (p.stock_qty ?? 0) > 0;
+        tdStock.innerHTML = inStock ? `<span class="pill">In stock: ${p.stock_qty}</span>` : `<span class="pill" style="border-color:#553; color:#f7c4c4">Out of stock</span>`;
+        tr.appendChild(tdStock);
+
+        const tdActions=document.createElement('td'); tdActions.className='actions';
+
+        // Qty + Add
+        const qtyWrap=document.createElement('div'); qtyWrap.className='qty-wrap';
+        const qty=document.createElement('input'); qty.type='number'; qty.min='1'; qty.value='1';
+        const add=document.createElement('button'); add.textContent='Add to cart';
+        add.disabled = !inStock;
+        add.addEventListener('click',()=>{
+          const n = Math.max(1, parseInt(qty.value||'1',10));
+          const id = String(p.sku||p.id||p.title||Math.random());
+          if(!cart[id]) cart[id]={ id, sku:p.sku||'', name:p.title||'', price:priceEx, img:p.image_url||'', qty:0, pack:p.pack_size||'' };
+          cart[id].qty += n;
+          saveCart(); updateBadge(); flash(add,'Added!');
         });
+        qtyWrap.appendChild(qty); qtyWrap.appendChild(add);
+        tdActions.appendChild(qtyWrap);
 
-      tbody.innerHTML=''; rows.forEach(r=>tbody.appendChild(r));
+        // Enquire
+        const enq=document.createElement('a');
+        enq.href=enquireLink(p); enq.target='_blank'; enq.rel='noopener'; enq.textContent='Enquire';
+        enq.className='btn-secondary'; enq.style.padding='8px 10px';
+        tdActions.appendChild(enq);
+
+        // Wishlist
+        const wishBtn=document.createElement('button');
+        const pid = String(p.sku||p.id||p.title||'x');
+        function setHeart(){ wishBtn.textContent = wish[pid] ? '♥' : '♡'; }
+        setHeart();
+        wishBtn.className='btn-secondary';
+        wishBtn.title='Wishlist';
+        wishBtn.style.width='44px';
+        wishBtn.addEventListener('click',()=>{
+          wish[pid] ? delete wish[pid] : wish[pid]=true;
+          saveWish(); setHeart();
+        });
+        tdActions.appendChild(wishBtn);
+
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      }
     }
 
-    function flash(el,txt){
-      const old=el.textContent; el.disabled=true; el.textContent=txt;
-      setTimeout(()=>{ el.textContent=old; el.disabled=false; }, 900);
-    }
+    function flash(el,txt){ const old=el.textContent; el.disabled=true; el.textContent=txt; setTimeout(()=>{ el.textContent=old; el.disabled=false; }, 900); }
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-    search.addEventListener('input', ()=>render(window._all||[]));
+    // search debounce
+    let t; function onFilterChange(){ clearTimeout(t); t=setTimeout(()=>applyState(), 200); }
+    search.addEventListener('input', onFilterChange);
+    brandSel.addEventListener('change', ()=>applyState());
+    catSel.addEventListener('change', ()=>applyState());
+    sortSel.addEventListener('change', ()=>applyState());
+    vatToggle.addEventListener('change', ()=>applyState());
 
-    /* ==== CART PANEL ==== */
+    /* ========= CART PANEL ========= */
     const cartPanel = document.getElementById('cartPanel');
     const backdrop = document.getElementById('backdrop');
     const cartItems = document.getElementById('cartItems');
-    const cartTotalEl = document.getElementById('cartTotal');
+    const subTotalEl = document.getElementById('subTotal');
+    const vatAmountEl = document.getElementById('vatAmount');
+    const grandTotalEl = document.getElementById('grandTotal');
     const cartCountEl = document.getElementById('cartCount');
 
     function openCart(){ cartPanel.style.display='flex'; backdrop.style.display='block'; cartPanel.setAttribute('aria-hidden','false'); renderCart(); }
@@ -221,9 +341,9 @@ ${p.pack_size?('• Pack: '+p.pack_size):''}`;
         row.innerHTML = `
           <img src="${(it.img||'https://via.placeholder.com/56?text=SB')}" alt="">
           <div>
-            <div class="ci-title">${it.name}</div>
-            <div class="muted">${it.sku||''}</div>
-            <div class="muted">${money(it.price)} each</div>
+            <div class="ci-title">${escapeHtml(it.name)}</div>
+            <div class="muted">${escapeHtml(it.sku||'')}</div>
+            <div class="muted">${fmtGBP(it.price)} ex VAT (${escapeHtml(it.pack||'')})</div>
           </div>
           <div class="qty" data-id="${it.id}">
             <button class="btn-secondary" data-act="dec">–</button>
@@ -233,8 +353,13 @@ ${p.pack_size?('• Pack: '+p.pack_size):''}`;
           </div>`;
         cartItems.appendChild(row);
       }
+      const sub = cartSubTotal();
+      const vat = sub * VAT_RATE;
+      const grand = sub + vat;
+      subTotalEl.textContent = fmtGBP(sub);
+      vatAmountEl.textContent = fmtGBP(vat);
+      grandTotalEl.textContent = fmtGBP(grand);
       cartCountEl.textContent = String(cartItemsCount());
-      cartTotalEl.textContent = money(cartTotal());
       document.getElementById('whatsCheckout').href = makeWhatsAppLink();
     }
 
@@ -242,10 +367,12 @@ ${p.pack_size?('• Pack: '+p.pack_size):''}`;
       const items = Object.values(cart);
       const lines = [
         'Hello Suman Brothers, here is my order:',
-        ...items.map(it=>`• ${it.name} (${it.sku||it.id}) × ${it.qty} — ${money(it.price*it.qty)}`),
-        `Total: ${money(cartTotal())}`
+        ...items.map(it=>`• ${it.name} (${it.sku||it.id}) × ${it.qty} — ${fmtGBP(it.price*it.qty)} ex VAT`),
+        `Subtotal: ${fmtGBP(cartSubTotal())}`,
+        `VAT (20%): ${fmtGBP(cartSubTotal()*VAT_RATE)}`,
+        `Total: ${fmtGBP(cartSubTotal()*(1+VAT_RATE))}`
       ];
-      return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\n'))}`;
+      return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\\n'))}`;
     }
 
     cartItems.addEventListener('click', (e)=>{
@@ -269,9 +396,51 @@ ${p.pack_size?('• Pack: '+p.pack_size):''}`;
       catch{ alert('Copy failed.'); }
     });
 
-    /* ==== INIT ==== */
+    document.getElementById('exportCsv').addEventListener('click', ()=>{
+      const items = Object.values(cart);
+      const rows = [['SKU','Name','Pack','Qty','Unit Price (ex VAT)','Line Total (ex VAT)']]
+        .concat(items.map(it=>[it.sku||it.id, it.name, it.pack||'', it.qty, it.price, (it.price*it.qty).toFixed(2)]));
+      const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'order.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    /* ========= ENQUIRE LINK ========= */
+    function enquireLink(p){
+      const msg = `Hello Suman Brothers, I would like to enquire/order:
+• ${p.title||''} (${p.sku||''})
+${p.price!=null?('• Price (ex VAT): '+fmtGBP(Number(p.price))) : ''}
+${p.pack_size?('• Pack: '+p.pack_size):''}`;
+      return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+    }
+
+    /* ========= INIT ========= */
     updateBadge();
     fetchProducts();
+
+    /* ========= PWA: SW + Install button ========= */
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(()=>{});
+    })();
+
+    let deferredPrompt;
+    const installBtn = document.getElementById('installAppBtn');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault(); deferredPrompt = e; installBtn.style.display='inline-block';
+    });
+    installBtn.addEventListener('click', async () => {
+      if(!deferredPrompt) return;
+      installBtn.disabled=true;
+      try{ deferredPrompt.prompt(); await deferredPrompt.userChoice; }
+      finally{ deferredPrompt=null; installBtn.style.display='none'; installBtn.disabled=false; }
+    });
+    window.addEventListener('appinstalled', ()=> installBtn.style.display='none');
+
   </script>
 </body>
 </html>
