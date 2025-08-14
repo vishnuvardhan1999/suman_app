@@ -1,5 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+  <button id="installBtn" style="display:none;background:#22c55e;color:#051625;border:none;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer">
+  Install App
+</button>
+
 <head>
   <meta charset="UTF-8" />
   <title>Suman APP — Live Catalog</title>
@@ -102,6 +106,13 @@ ${p.pack_size?('• Pack: '+p.pack_size):''}`;
 
     search.addEventListener('input', ()=>render(window._all||[]));
     fetchProducts();
+    <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b1220">
+<link rel="apple-touch-icon" href="/suman_logo-192.png">
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+  }
   </script>
 </body>
 </html>
