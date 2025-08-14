@@ -1,7 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
- </button>
-
 <head>
   <meta charset="UTF-8" />
   <title>Suman APP — Live Catalog</title>
@@ -10,9 +8,11 @@
     :root{--bg:#0b1220;--card:#121a2a;--text:#e9eef7;--muted:#a6b0c3;--accent:#5cc8ff}
     *{box-sizing:border-box}
     html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    a{color:inherit;text-decoration:none}
     .wrap{max-width:1100px;margin:0 auto;padding:24px}
     .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 16px rgba(0,0,0,.25)}
-    h1{margin:0} .row{display:flex;gap:10px;align-items:center;margin:14px 0}
+    h1{margin:0}
+    .row{display:flex;gap:10px;align-items:center;margin:14px 0}
     input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid #22324d;background:#0e1628;color:var(--text)}
     button{background:var(--accent);color:#051625;border:none;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer}
     .muted{color:var(--muted);font-size:12px}
@@ -21,15 +21,35 @@
     th{color:var(--muted)}
     img.thumb{width:60px;height:60px;object-fit:cover;border-radius:8px;background:#0e1628}
     .price{font-weight:700}
+
+    /* Cart UI */
+    .cart-badge{background:#1a253b;border:1px solid #22324d;border-radius:10px;padding:8px 12px;cursor:pointer}
+    .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:saturate(80%) blur(1px);display:none}
+    .cart-panel{position:fixed;top:0;right:0;height:100%;width:380px;max-width:94vw;background:var(--card);box-shadow:-8px 0 24px rgba(0,0,0,.4);display:none;flex-direction:column}
+    .cart-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #22324d}
+    .cart-items{padding:10px 12px;overflow:auto;flex:1}
+    .cart-item{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed #22324d}
+    .cart-item img{width:56px;height:56px;border-radius:8px;object-fit:cover;background:#0e1628}
+    .ci-title{font-weight:600}
+    .qty{display:flex;align-items:center;gap:6px}
+    .qty button{padding:4px 10px;border-radius:8px}
+    .cart-footer{border-top:1px solid #22324d;padding:12px 16px;display:grid;gap:10px}
+    .cart-total{display:flex;justify-content:space-between;font-weight:800}
+    .btn-secondary{background:#1a253b;color:var(--text);border:1px solid #22324d}
+    .btn-danger{background:#ee5555;color:#0b1220}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="row" style="justify-content:space-between">
       <h1>Suman APP — Live Catalog</h1>
-      <button id="reload">Reload</button>
+      <div class="row" style="gap:8px">
+        <button id="reload">Reload</button>
+        <a id="cartBadge" class="cart-badge" href="javascript:void(0)">Cart (0)</a>
+      </div>
     </div>
-    <p class="muted">Reading from Supabase table <b>app_suman_brothers</b>. Search and click Enquire to WhatsApp.</p>
+    <p class="muted">Reading from Supabase table <b>app_suman_brothers</b>. Search, <b>Add to cart</b>, or click <b>Enquire</b> to WhatsApp.</p>
 
     <div class="card">
       <div class="row"><input id="search" placeholder="Search by title, SKU, brand, category…" /></div>
@@ -37,7 +57,15 @@
       <table id="grid" style="display:none">
         <thead>
           <tr>
-            <th>Image</th><th>Title / Description</th><th>SKU</th><th>Brand</th><th>Category</th><th>Price</th><th>Pack</th><th>Stock</th><th>Enquire</th>
+            <th>Image</th>
+            <th>Title / Description</th>
+            <th>SKU</th>
+            <th>Brand</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Pack</th>
+            <th>Stock</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -45,13 +73,35 @@
     </div>
   </div>
 
+  <!-- CART DRAWER -->
+  <div id="backdrop" class="backdrop"></div>
+  <aside id="cartPanel" class="cart-panel" aria-hidden="true">
+    <div class="cart-header">
+      <div style="font-size:18px;font-weight:800">Your Cart</div>
+      <button id="closeCart" class="btn-secondary" title="Close">✕</button>
+    </div>
+    <div id="cartItems" class="cart-items"></div>
+    <div class="cart-footer">
+      <div class="cart-total"><span>Items</span><span id="cartCount">0</span></div>
+      <div class="cart-total"><span>Total</span><span id="cartTotal">£0.00</span></div>
+      <div class="actions">
+        <button id="clearCart" class="btn-danger">Clear cart</button>
+        <a id="whatsCheckout" class="btn-secondary" target="_blank" rel="noopener">Order via WhatsApp</a>
+        <button id="copyOrder" class="btn-secondary">Copy order text</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Supabase -->
   <script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script>
+    /* ==== CONFIG ==== */
     const SUPABASE_URL = "https://gvaznlyfmsypqirlcheq.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2YXpubHlmbXN5cHFpcmxjaGVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNjQzMTksImV4cCI6MjA3MDc0MDMxOX0.OD0gM6t_lrwT5U_QLbK8ckozS_s6OC2pbaqQO-xTAcM";
     const TABLE = "app_suman_brothers";
     const WHATSAPP_NUMBER = "447442232768";
 
+    /* ==== HELPERS ==== */
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const statusEl = document.getElementById('status');
     const grid = document.getElementById('grid');
@@ -59,7 +109,14 @@
     const search = document.getElementById('search');
     document.getElementById('reload').addEventListener('click', fetchProducts);
 
+    const CART_KEY = 'sb_cart';
+    const cart = JSON.parse(localStorage.getItem(CART_KEY) || '{}'); // { id: {id,name,price,img,sku,qty} }
+    function saveCart(){ localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
     function money(v){ if(v==null||v==='')return ''; const n=Number(v); return isNaN(n)?String(v):'£'+n.toFixed(2); }
+    function cartItemsCount(){ return Object.values(cart).reduce((n,it)=>n+it.qty,0); }
+    function cartTotal(){ return Object.values(cart).reduce((s,it)=>s + (Number(it.price)||0)*it.qty,0); }
+    function updateBadge(){ document.getElementById('cartBadge').textContent = `Cart (${cartItemsCount()})`; }
+
     function enquireLink(p){
       const msg = `Hello Suman Brothers, I would like to enquire/order:
 • ${p.title||''} (${p.sku||''})
@@ -68,6 +125,7 @@ ${p.pack_size?('• Pack: '+p.pack_size):''}`;
       return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
     }
 
+    /* ==== DATA LOAD ==== */
     async function fetchProducts(){
       statusEl.textContent="Loading products…"; grid.style.display="none"; tbody.innerHTML='';
       const { data, error } = await client
@@ -80,31 +138,140 @@ ${p.pack_size?('• Pack: '+p.pack_size):''}`;
       render(window._all); grid.style.display='';
     }
 
+    /* ==== TABLE RENDER ==== */
     function render(list){
       const q=(search.value||'').trim().toLowerCase();
-      const rows=list.filter(p => !q || [p.title,p.sku,p.brand,p.category,p.short_description].some(v => (v||'').toLowerCase().includes(q)))
-      .map(p=>{
-        const tr=document.createElement('tr');
-        const img=document.createElement('img'); img.className='thumb'; img.src=(p.image_url||'').trim()||'https://via.placeholder.com/60?text=SB'; img.alt=p.title||'image';
-        const tdImg=document.createElement('td'); tdImg.appendChild(img); tr.appendChild(tdImg);
-        const tdTitle=document.createElement('td'); tdTitle.innerHTML=`<b>${p.title||''}</b><br><span class="muted">${p.short_description||''}</span>`; tr.appendChild(tdTitle);
-        const tdSku=document.createElement('td'); tdSku.textContent=p.sku||''; tr.appendChild(tdSku);
-        const tdBrand=document.createElement('td'); tdBrand.textContent=p.brand||''; tr.appendChild(tdBrand);
-        const tdCat=document.createElement('td'); tdCat.textContent=p.category||''; tr.appendChild(tdCat);
-        const tdPrice=document.createElement('td'); tdPrice.innerHTML=`<span class="price">${money(p.price)}</span>`; tr.appendChild(tdPrice);
-        const tdPack=document.createElement('td'); tdPack.textContent=p.pack_size||''; tr.appendChild(tdPack);
-        const tdStock=document.createElement('td'); tdStock.textContent=(p.stock_qty ?? ''); tr.appendChild(tdStock);
-        const tdEnq=document.createElement('td'); const a=document.createElement('a'); a.href=enquireLink(p); a.target='_blank'; a.rel='noopener'; a.textContent='Enquire';
-        a.style.display='inline-block'; a.style.padding='8px 10px'; a.style.background='var(--accent)'; a.style.color='#051625'; a.style.borderRadius='10px'; a.style.fontWeight='700';
-        tdEnq.appendChild(a); tr.appendChild(tdEnq);
-        return tr;
-      });
+      const rows=list
+        .filter(p => !q || [p.title,p.sku,p.brand,p.category,p.short_description].some(v => (v||'').toLowerCase().includes(q)))
+        .map(p=>{
+          const tr=document.createElement('tr');
+
+          const img=document.createElement('img');
+          img.className='thumb';
+          img.src=(p.image_url||'').trim()||'https://via.placeholder.com/60?text=SB';
+          img.alt=p.title||'image';
+          const tdImg=document.createElement('td'); tdImg.appendChild(img); tr.appendChild(tdImg);
+
+          const tdTitle=document.createElement('td');
+          tdTitle.innerHTML=`<b>${p.title||''}</b><br><span class="muted">${p.short_description||''}</span>`;
+          tr.appendChild(tdTitle);
+
+          const tdSku=document.createElement('td'); tdSku.textContent=p.sku||''; tr.appendChild(tdSku);
+          const tdBrand=document.createElement('td'); tdBrand.textContent=p.brand||''; tr.appendChild(tdBrand);
+          const tdCat=document.createElement('td'); tdCat.textContent=p.category||''; tr.appendChild(tdCat);
+          const tdPrice=document.createElement('td'); tdPrice.innerHTML=`<span class="price">${money(p.price)}</span>`; tr.appendChild(tdPrice);
+          const tdPack=document.createElement('td'); tdPack.textContent=p.pack_size||''; tr.appendChild(tdPack);
+          const tdStock=document.createElement('td'); tdStock.textContent=(p.stock_qty ?? ''); tr.appendChild(tdStock);
+
+          const tdActions=document.createElement('td'); tdActions.style.whiteSpace='nowrap';
+
+          // Add to cart
+          const add=document.createElement('button');
+          add.className='btn-add';
+          add.textContent='Add to cart';
+          add.style.marginRight='8px';
+          add.addEventListener('click',()=>{
+            const id = String(p.sku||p.id||p.title||Math.random());
+            if(!cart[id]) cart[id]={ id, sku:p.sku||'', name:p.title||'', price:Number(p.price)||0, img:p.image_url||'', qty:0 };
+            cart[id].qty++;
+            saveCart(); updateBadge(); flash(add,'Added!');
+          });
+          tdActions.appendChild(add);
+
+          // Enquire
+          const a=document.createElement('a');
+          a.href=enquireLink(p); a.target='_blank'; a.rel='noopener'; a.textContent='Enquire';
+          a.className='btn-enquire';
+          a.style.display='inline-block'; a.style.padding='8px 10px'; a.style.background='var(--accent)'; a.style.color='#051625'; a.style.borderRadius='10px'; a.style.fontWeight='700';
+          tdActions.appendChild(a);
+
+          tr.appendChild(tdActions);
+          return tr;
+        });
+
       tbody.innerHTML=''; rows.forEach(r=>tbody.appendChild(r));
     }
 
+    function flash(el,txt){
+      const old=el.textContent; el.disabled=true; el.textContent=txt;
+      setTimeout(()=>{ el.textContent=old; el.disabled=false; }, 900);
+    }
+
     search.addEventListener('input', ()=>render(window._all||[]));
+
+    /* ==== CART PANEL ==== */
+    const cartPanel = document.getElementById('cartPanel');
+    const backdrop = document.getElementById('backdrop');
+    const cartItems = document.getElementById('cartItems');
+    const cartTotalEl = document.getElementById('cartTotal');
+    const cartCountEl = document.getElementById('cartCount');
+
+    function openCart(){ cartPanel.style.display='flex'; backdrop.style.display='block'; cartPanel.setAttribute('aria-hidden','false'); renderCart(); }
+    function closeCart(){ cartPanel.style.display='none'; backdrop.style.display='none'; cartPanel.setAttribute('aria-hidden','true'); }
+    document.getElementById('cartBadge').addEventListener('click', openCart);
+    document.getElementById('closeCart').addEventListener('click', closeCart);
+    backdrop.addEventListener('click', closeCart);
+
+    function renderCart(){
+      const items = Object.values(cart);
+      cartItems.innerHTML = items.length ? '' : '<p class="muted">Your cart is empty.</p>';
+      for(const it of items){
+        const row = document.createElement('div');
+        row.className='cart-item';
+        row.innerHTML = `
+          <img src="${(it.img||'https://via.placeholder.com/56?text=SB')}" alt="">
+          <div>
+            <div class="ci-title">${it.name}</div>
+            <div class="muted">${it.sku||''}</div>
+            <div class="muted">${money(it.price)} each</div>
+          </div>
+          <div class="qty" data-id="${it.id}">
+            <button class="btn-secondary" data-act="dec">–</button>
+            <span>${it.qty}</span>
+            <button data-act="inc">+</button>
+            <button class="btn-danger" data-act="del" style="margin-left:8px">✕</button>
+          </div>`;
+        cartItems.appendChild(row);
+      }
+      cartCountEl.textContent = String(cartItemsCount());
+      cartTotalEl.textContent = money(cartTotal());
+      document.getElementById('whatsCheckout').href = makeWhatsAppLink();
+    }
+
+    function makeWhatsAppLink(){
+      const items = Object.values(cart);
+      const lines = [
+        'Hello Suman Brothers, here is my order:',
+        ...items.map(it=>`• ${it.name} (${it.sku||it.id}) × ${it.qty} — ${money(it.price*it.qty)}`),
+        `Total: ${money(cartTotal())}`
+      ];
+      return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\n'))}`;
+    }
+
+    cartItems.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button'); if(!btn) return;
+      const wrap = btn.closest('.qty'); const id = wrap?.dataset.id; if(!id || !cart[id]) return;
+      const act = btn.dataset.act;
+      if(act==='inc'){ cart[id].qty++; }
+      if(act==='dec'){ cart[id].qty = Math.max(1, cart[id].qty-1); }
+      if(act==='del'){ delete cart[id]; }
+      saveCart(); updateBadge(); renderCart();
+    });
+
+    document.getElementById('clearCart').addEventListener('click', ()=>{
+      Object.keys(cart).forEach(k=>delete cart[k]);
+      saveCart(); updateBadge(); renderCart();
+    });
+
+    document.getElementById('copyOrder').addEventListener('click', async ()=>{
+      const text = decodeURIComponent(makeWhatsAppLink().split('text=')[1]||'');
+      try{ await navigator.clipboard.writeText(text); alert('Order copied to clipboard!'); }
+      catch{ alert('Copy failed.'); }
+    });
+
+    /* ==== INIT ==== */
+    updateBadge();
     fetchProducts();
-    
   </script>
 </body>
 </html>
